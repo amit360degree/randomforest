@@ -1,0 +1,129 @@
+
+install.packages("C50")
+library("rpart")
+library("rattle")
+library("C50")
+
+
+fit_d <- rpart(revisit~hit_count+visits+total_pages+time_spend+last_touch_point+entry_pagename+exit_pagename,data = training,
+             method="annova",control=rpart.control(minsplit = 20))
+
+
+summary(fit_d)
+printcp(fit_d)
+
+
+fancyRpartPlot(fit_d,cex=.5)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#######validation####################
+
+t1<-cbind(training, predcited=predict(fit_d,newdata=training, type="class"))
+t2<-cbind(testing, predcited=predict(fit_d, newdata=testing, type="class"))
+table(t1$revisit, t1$predcited)
+table(t2$revisit, t2$predcited)
+
+
+
+
+
+#########Ensemble Model#######################33
+
+
+
+install.packages("h2o",dependencies=T)
+install.packages("caret")
+library("h2o")
+
+
+##starting the h2o connection
+h2o.init(
+  nthreads=-1,            
+  max_mem_size = "2G
+  ")
+
+
+getwd()
+setwd("F:\\fnp\\git upload\\git upload\\Ensemble learning class files")
+
+
+## Load a file from disk
+train <- h2o.importFile(path = normalizePath("training.csv"))
+test <- h2o.importFile(path = normalizePath("Testing.csv"))
+
+#Assignment within H2o
+train <- h2o.assign(train, "train.hex")   #Train data: H2O name train.hex
+test <- h2o.assign(test, "test.hex")     #Test data: H2O name test.hex
+
+
+
+
+rf1 <- h2o.randomForest(         
+  training_frame = train,        
+  validation_frame = test,      
+  x=c("hit_count","visits","total_pages","time_spend","last_touch_point","entry_pagename","exit_pagename"),                     ## the predictor columns, by column index
+  y="revisit",                      
+  model_id = "1st", 
+  ntrees = 1000,                 
+  max_depth = 5,               
+  stopping_rounds = 15,          
+  stopping_tolerance = 0.0001,    
+  score_each_iteration = T,     
+  seed=5555555)    
+
+
+summary(rf1)
+
+
+rf1@model$validation_metrics   ## A more direct way to access the validation 
+rf1@model$validation_metrics@metrics$AUC    #AUC
+rf1@model$validation_metrics@metrics$Gini   #Gini
+
+
+
+
+
+
+gbm3 <- h2o.gbm(
+  training_frame = train,     ##
+  validation_frame = test,   ##
+  x=c("hit_count","visits","total_pages","time_spend","last_touch_point","entry_pagename","exit_pagename"),                     ## the predictor columns, by column index
+  y="revisit",                          
+  ntrees = 1000,                
+  learn_rate = 0.05,           ##learning rate
+  max_depth = 5,              
+##  sample_rate = 0.4,          ## use a random 50% of the rows to fit each tree
+##  col_sample_rate = 0.85,       ## use 85% of the columns to fit each tree
+  stopping_rounds = 25,        
+  stopping_tolerance = 0.0005,  
+  score_each_iteration = T,   
+  model_id = "gbm_covType3",  
+  seed = 25000000)                
+
+
+
+summary(gbm3)
+
+
+gbm3@model$validation_metrics   ## A more direct way to access the validation 
+gbm3@model$validation_metrics@metrics$AUC    #AUC
+gbm3@model$validation_metrics@metrics$Gini   #Gini
+
+
+
+
+
+
+
